@@ -114,8 +114,8 @@ class LedgerController extends ChangeNotifier {
       }
       lastSyncAt = DateTime.now();
       await _store.saveLastSyncAt(lastSyncAt!);
-    } catch (_) {
-      syncMessage = '离线模式：正在使用本地缓存';
+    } catch (error) {
+      syncMessage = '同步失败：$error';
     } finally {
       isSyncing = false;
       notifyListeners();
@@ -274,6 +274,15 @@ class LedgerController extends ChangeNotifier {
           );
         }
       }
+      if (operation.body != null && (operation.path == '/api/transactions' || operation.path == '/api/transactions/sync')) {
+        final body = <String, dynamic>{...operation.body!};
+        final type = body['type'] as String? ?? 'expense';
+        final category = body['category'] as String? ?? '其他';
+        body['type'] = type;
+        body['category'] = category;
+        body['categorySource'] = body['categorySource'] == 'custom' || !_isSystemCategory(type, category) ? 'custom' : 'system';
+        operation = SyncOperation(method: operation.method, path: operation.path, body: body, localId: operation.localId);
+      }
       final response = await _api.send(operation);
       if (operation.method == 'POST' && operation.path == '/api/transactions' && operation.localId != null) {
         final decoded = jsonDecode(response.body);
@@ -338,11 +347,16 @@ class LedgerController extends ChangeNotifier {
         'type': item.type,
         'amount': item.amount,
         'category': item.category,
-        'categorySource': item.categorySource,
+        'categorySource': item.categorySource == 'custom' || !_isSystemCategory(item.type, item.category) ? 'custom' : 'system',
         'note': item.note,
         'transactionDate': _date(item.transactionDate),
         if (item.subBookId != null) 'subBookId': item.subBookId,
       };
+  bool _isSystemCategory(String type, String category) {
+    const expense = {'餐饮', '交通', '购物', '娱乐', '学习', '订阅', '社交'};
+    const income = {'工资', '理财', '红包'};
+    return (type == 'income' ? income : expense).contains(category);
+  }
   String _date(DateTime value) => '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 }
 

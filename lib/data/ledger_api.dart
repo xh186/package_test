@@ -103,7 +103,8 @@ class LedgerApi {
 
   void _requireSuccess(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError('云端请求失败 (${response.statusCode})');
+      final detail = response.body.trim();
+      throw StateError('云端请求失败 (${response.statusCode})${detail.isEmpty ? '' : ': $detail'}');
     }
   }
 }
