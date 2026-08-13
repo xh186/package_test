@@ -117,7 +117,11 @@ class _HomeScreenState extends State<HomeScreen> {
           onEdit: (item) => _editTransaction(item),
           onDelete: _deleteTransaction,
         ),
-      2 => _SubBooks(books: controller.subBooks, onOpen: _openSubBook),
+      2 => _SubBooks(
+          books: controller.subBooks,
+          onOpen: _openSubBook,
+          onDelete: _deleteSubBook,
+        ),
       3 => _Statistics(transactions: controller.transactions),
       _ => _Calendar(transactions: controller.transactions, month: _month, onMonth: (value) => setState(() => _month = value), onOpen: _openDay),
     };
@@ -193,6 +197,25 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<bool> _deleteSubBook(LedgerSubBook book) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除子账本？'),
+        content: Text('“${book.name}”将被删除，其中的账目会保留在总账本中。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除')),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await widget.controller.deleteSubBook(book);
+      return true;
+    }
+    return false;
+  }
+
   Future<void> _createSubBook() async {
     final name = TextEditingController();
     DateTime date = DateTime.now();
@@ -221,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openSubBook(LedgerSubBook book) {
     final transactions = widget.controller.transactions.where((item) => item.subBookId == book.id).toList();
     final detail = LedgerSubBook(id: book.id, name: book.name, eventDate: book.eventDate, transactions: transactions);
-    Navigator.of(context).push(MaterialPageRoute(builder: (_) => _SubBookDetail(book: detail, controller: widget.controller, edit: _editTransaction, remove: _deleteTransaction)));
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => _SubBookDetail(book: detail, controller: widget.controller, edit: _editTransaction, remove: _deleteTransaction, onDelete: _deleteSubBook)));
   }
   void _openDay(DateTime day) => showModalBottomSheet<void>(context: context, builder: (_) => _DaySheet(day: day, transactions: widget.controller.transactions.where((item) => _sameDay(item.transactionDate, day)).toList(), onEdit: (item) => _editTransaction(item), onDelete: _deleteTransaction));
 }
@@ -348,14 +371,68 @@ class _Records extends StatelessWidget {
 }
 
 class _SubBooks extends StatelessWidget {
-  const _SubBooks({required this.books, required this.onOpen});
+  const _SubBooks({required this.books, required this.onOpen, required this.onDelete});
   final List<LedgerSubBook> books;
   final ValueChanged<LedgerSubBook> onOpen;
+  final Future<void> Function(LedgerSubBook) onDelete;
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
         const _Heading(kicker: 'ACTIVITY / COLLECTIONS', title: '子账本'),
         const SizedBox(height: 18),
-        if (books.isEmpty) const _EmptyState(text: '还没有子账本\n可按旅行、装修等活动建立独立账本') else ...books.map((book) => Card(child: InkWell(onTap: () => onOpen(book), borderRadius: BorderRadius.circular(8), child: Padding(padding: const EdgeInsets.all(18), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [const Icon(Icons.folder_copy_outlined, color: LedgerTheme.cobalt), Text(_date(book.eventDate), style: const TextStyle(color: LedgerTheme.muted, fontSize: 12))]), const SizedBox(height: 12), Text(book.name, style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 12), Text('${book.transactionCount} 条账目', style: const TextStyle(color: LedgerTheme.muted)), const SizedBox(height: 12), Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [_MiniStat('收入', book.income, LedgerTheme.mint), _MiniStat('支出', book.expense, LedgerTheme.coral), _MiniStat('结余', book.balance, LedgerTheme.yellow)]), const SizedBox(height: 12), const Align(alignment: Alignment.centerRight, child: Text('查看明细  →', style: TextStyle(color: LedgerTheme.cobalt, fontWeight: FontWeight.w700)))]))))),
+        if (books.isEmpty)
+          const _EmptyState(text: '还没有子账本\n可按旅行、装修等活动建立独立账本')
+        else
+          ...books.map(
+            (book) => Card(
+              child: InkWell(
+                onTap: () => onOpen(book),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Icon(Icons.folder_copy_outlined, color: LedgerTheme.cobalt),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(_date(book.eventDate), style: const TextStyle(color: LedgerTheme.muted, fontSize: 12)),
+                              IconButton(
+                                tooltip: '删除子账本',
+                                onPressed: () => onDelete(book),
+                                icon: const Icon(Icons.delete_outline),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(book.name, style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 12),
+                      Text('${book.transactionCount} 条账目', style: const TextStyle(color: LedgerTheme.muted)),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _MiniStat('收入', book.income, LedgerTheme.mint),
+                          _MiniStat('支出', book.expense, LedgerTheme.coral),
+                          _MiniStat('结余', book.balance, LedgerTheme.yellow),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Align(
+                        alignment: Alignment.centerRight,
+                        child: Text('查看明细  →', style: TextStyle(color: LedgerTheme.cobalt, fontWeight: FontWeight.w700)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
       ]);
 }
 
@@ -396,11 +473,12 @@ class _Calendar extends StatelessWidget {
 }
 
 class _SubBookDetail extends StatefulWidget {
-  const _SubBookDetail({required this.book, required this.controller, required this.edit, required this.remove});
+  const _SubBookDetail({required this.book, required this.controller, required this.edit, required this.remove, required this.onDelete});
   final LedgerSubBook book;
   final LedgerController controller;
   final Future<void> Function([LedgerTransaction? item, int? subBookId]) edit;
   final Future<void> Function(LedgerTransaction) remove;
+  final Future<bool> Function(LedgerSubBook) onDelete;
 
   @override
   State<_SubBookDetail> createState() => _SubBookDetailState();
@@ -416,7 +494,21 @@ class _SubBookDetailState extends State<_SubBookDetail> {
     final months = book.transactions.map((item) => _monthKey(item.transactionDate)).toSet().toList()..sort((a, b) => b.compareTo(a));
     final filtered = book.transactions.where((item) => (_type == null || item.type == _type) && (_month == null || _monthKey(item.transactionDate) == _month)).toList();
     return Scaffold(
-      appBar: AppBar(title: Text(book.name)),
+      appBar: AppBar(
+        title: Text(book.name),
+        actions: [
+          IconButton(
+            tooltip: '删除子账本',
+            onPressed: () async {
+              final deleted = await widget.onDelete(book);
+              if (deleted && mounted) {
+                Navigator.of(context).pop();
+              }
+            },
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [

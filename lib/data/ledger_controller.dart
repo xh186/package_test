@@ -122,6 +122,18 @@ class LedgerController extends ChangeNotifier {
     unawaited(sync());
   }
 
+  Future<void> deleteSubBook(LedgerSubBook book) async {
+    subBooks = subBooks.where((item) => item.id != book.id).toList();
+    await _store.saveSubBooks(subBooks);
+    if (book.id > 0) {
+      await _store.enqueue(SyncOperation(method: 'DELETE', path: '/api/sub-books/${book.id}', body: null));
+    } else {
+      await _store.removePendingForLocalId(book.id);
+    }
+    notifyListeners();
+    unawaited(sync());
+  }
+
   Future<void> createSubBook(String name, DateTime eventDate) async {
     final book = LedgerSubBook(id: _nextTemporaryId(), name: name, eventDate: eventDate);
     subBooks = [...subBooks, book];
@@ -129,7 +141,7 @@ class LedgerController extends ChangeNotifier {
     await _store.enqueue(SyncOperation(method: 'POST', path: '/api/sub-books', body: {
       'name': name,
       'eventDate': _date(eventDate),
-    }));
+    }, localId: book.id));
     notifyListeners();
     unawaited(sync());
   }
