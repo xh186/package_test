@@ -59,10 +59,37 @@ jobs:
           path.write_text(text)
           PY
 
+          cat > android/build.gradle.kts <<'EOF'
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
+          rootProject.layout.buildDirectory.value(newBuildDir)
+
+          subprojects {
+              val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
+              project.layout.buildDirectory.value(newSubprojectBuildDir)
+          }
+
+          subprojects {
+              project.evaluationDependsOn(":app")
+          }
+
+          tasks.register<Delete>("clean") {
+              delete(rootProject.layout.buildDirectory)
+          }
+          EOF
+
           echo "Android build plugin versions used by CI:"
           grep -n -E "com.android.application|org.jetbrains.kotlin.android" android/settings.gradle.kts
           echo "JVM targets used by CI:"
           grep -n -E "sourceCompatibility|targetCompatibility|jvmToolchain" android/app/build.gradle.kts
+          echo "Flutter build directory redirection used by CI:"
+          grep -n "newBuildDir" android/build.gradle.kts
 
           rm -f test/widget_test.dart
 
@@ -90,6 +117,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ledger-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
