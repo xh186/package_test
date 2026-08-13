@@ -99,7 +99,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildView(LedgerController controller) {
     return switch (_tab) {
-      0 => _Overview(controller: controller, onEdit: (item) => _editTransaction(item)),
+      0 => _Overview(
+          controller: controller,
+          onEdit: (item) => _editTransaction(item),
+          onDelete: _deleteTransaction,
+        ),
       1 => _Records(
           transactions: controller.transactions,
           query: _query,
@@ -246,9 +250,10 @@ class _SyncBanner extends StatelessWidget {
 }
 
 class _Overview extends StatelessWidget {
-  const _Overview({required this.controller, required this.onEdit});
+  const _Overview({required this.controller, required this.onEdit, required this.onDelete});
   final LedgerController controller;
   final Future<void> Function(LedgerTransaction? item) onEdit;
+  final void Function(LedgerTransaction) onDelete;
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
         const _Heading(kicker: 'OVERVIEW / MAIN LEDGER', title: '总账本'),
@@ -259,7 +264,16 @@ class _Overview extends StatelessWidget {
         const SizedBox(height: 6),
         const Text('最近账目', style: TextStyle(fontFamily: 'serif', fontSize: 24, fontWeight: FontWeight.w600)),
         const SizedBox(height: 10),
-        if (controller.transactions.isEmpty) const _EmptyState(text: '还没有账目\n点按右下角开始记录') else ...controller.transactions.take(5).map((item) => _TransactionTile(item: item, onTap: () => onEdit(item))),
+        if (controller.transactions.isEmpty)
+          const _EmptyState(text: '还没有账目\n点按右下角开始记录')
+        else
+          ...controller.transactions.take(5).map(
+                (item) => _TransactionTile(
+                  item: item,
+                  onTap: () => onEdit(item),
+                  onDelete: () => onDelete(item),
+                ),
+              ),
       ]);
 }
 
@@ -305,7 +319,30 @@ class _Records extends StatelessWidget {
       const SizedBox(height: 18),
       Text('共 ${filteredTransactions.length} 条记录', style: const TextStyle(color: LedgerTheme.muted, fontSize: 12, letterSpacing: 1)),
       const SizedBox(height: 8),
-      if (filteredTransactions.isEmpty) const _EmptyState(text: '没有匹配的账目') else ...filteredTransactions.map((item) => Dismissible(key: ValueKey(item.id), direction: DismissDirection.endToStart, confirmDismiss: (_) async { onDelete(item); return false; }, background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 24), color: LedgerTheme.coral, child: const Icon(Icons.delete_outline)), child: _TransactionTile(item: item, onTap: () => onEdit(item)))),
+      if (filteredTransactions.isEmpty)
+        const _EmptyState(text: '没有匹配的账目')
+      else
+        ...filteredTransactions.map(
+              (item) => Dismissible(
+                key: ValueKey(item.id),
+                direction: DismissDirection.endToStart,
+                confirmDismiss: (_) async {
+                  onDelete(item);
+                  return false;
+                },
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 24),
+                  color: LedgerTheme.coral,
+                  child: const Icon(Icons.delete_outline),
+                ),
+                child: _TransactionTile(
+                  item: item,
+                  onTap: () => onEdit(item),
+                  onDelete: () => onDelete(item),
+                ),
+              ),
+            ),
     ]);
   }
 }
