@@ -328,8 +328,32 @@ class _DaySheet extends StatelessWidget {
   final List<LedgerTransaction> transactions;
   final Future<void> Function(LedgerTransaction) onEdit;
   final void Function(LedgerTransaction) onDelete;
+
   @override
-  Widget build(BuildContext context) => SafeArea(child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${day.year}年${day.month}月${day.day}日', style: Theme.of(context).textTheme.titleLarge), const SizedBox(height: 12), if (transactions.isEmpty) const Text('当天没有账目', style: TextStyle(color: LedgerTheme.muted)) else ...transactions.map((item) => _TransactionTile(item: item, onTap: () => onEdit(item), onDelete: () => onDelete(item))), const SizedBox(height: 10)]));
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('${day.year}年${day.month}月${day.day}日', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 12),
+            if (transactions.isEmpty)
+              const Text('当天没有账目', style: TextStyle(color: LedgerTheme.muted))
+            else
+              ...transactions.map((item) => _TransactionTile(
+                    item: item,
+                    onTap: () => onEdit(item),
+                    onDelete: () => onDelete(item),
+                  )),
+            const SizedBox(height: 10),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SummaryCards extends StatelessWidget {
@@ -345,7 +369,7 @@ class _SummaryCard extends StatelessWidget { const _SummaryCard({required this.l
 class _MiniStat extends StatelessWidget { const _MiniStat(this.label, this.value, this.color); final String label; final double value; final Color color; @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5), color: color, child: Text('$label  ¥${value.toStringAsFixed(0)}', style: const TextStyle(fontSize: 11))); }
 class _Heading extends StatelessWidget { const _Heading({required this.kicker, required this.title}); final String kicker; final String title; @override Widget build(BuildContext context) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(kicker, style: const TextStyle(fontSize: 10, color: LedgerTheme.muted, letterSpacing: 1.3)), const SizedBox(height: 4), Text(title, style: Theme.of(context).textTheme.headlineMedium)]); }
 class _PanelKicker extends StatelessWidget { const _PanelKicker({required this.text}); final String text; @override Widget build(BuildContext context) => Row(children: [Container(width: 18, height: 3, color: LedgerTheme.cobalt), const SizedBox(width: 7), Text(text, style: const TextStyle(fontSize: 10, color: LedgerTheme.muted, letterSpacing: 1.2))]); }
-class _FilterChip extends StatelessWidget { const _FilterChip({required this.label, required this.selected, required this.onTap}); final String label; final bool selected; final VoidCallback onTap; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(right: 8), child: ChoiceChip(label: Text(label), selected: selected, onSelected: (_) => onTap(), selectedColor: LedgerTheme.cobalt.withOpacity(.15), side: const BorderSide(color: LedgerTheme.line))); }
+class _FilterChip extends StatelessWidget { const _FilterChip({required this.label, required this.selected, required this.onTap}); final String label; final bool selected; final VoidCallback onTap; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.only(right: 8), child: ChoiceChip(label: Text(label), selected: selected, onSelected: (_) => onTap(), selectedColor: LedgerTheme.cobalt.withValues(alpha: .15), side: const BorderSide(color: LedgerTheme.line))); }
 class _EmptyState extends StatelessWidget { const _EmptyState({required this.text}); final String text; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 48), child: Center(child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: LedgerTheme.muted, height: 1.6)))); }
 class _TransactionTile extends StatelessWidget { const _TransactionTile({required this.item, required this.onTap, this.onDelete}); final LedgerTransaction item; final VoidCallback onTap; final VoidCallback? onDelete; @override Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(onTap: onTap, leading: CircleAvatar(backgroundColor: item.isIncome ? LedgerTheme.mint : LedgerTheme.coral, child: Icon(item.isIncome ? Icons.south_west : Icons.north_east, color: LedgerTheme.ink, size: 17)), title: Text(item.category), subtitle: Text('${_date(item.transactionDate)}${item.note.isEmpty ? '' : ' · ${item.note}'}', maxLines: 1, overflow: TextOverflow.ellipsis), trailing: Row(mainAxisSize: MainAxisSize.min, children: [Text('${item.isIncome ? '+' : '-'}¥${item.amount.toStringAsFixed(2)}', style: TextStyle(color: item.isIncome ? const Color(0xFF277849) : const Color(0xFFBD543F), fontFamily: 'monospace', fontWeight: FontWeight.w700)), if (onDelete != null) IconButton(tooltip: '删除', onPressed: onDelete, icon: const Icon(Icons.delete_outline, size: 19))]))); }
 bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
