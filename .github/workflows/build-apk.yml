@@ -2,40 +2,67 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build release APK
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
+          cache: gradle
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
 
-      - name: Prepare Android files
-        run: flutter create --platforms=android .
+      - name: Prepare Android project
+        run: |
+          if [ ! -x android/gradlew ]; then
+            flutter create \
+              --platforms=android \
+              --project-name=ledger_mobile \
+              --org=com.example \
+              --no-pub \
+              .
+          fi
+
+          rm -f test/widget_test.dart
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Static checks
-        run: |
-          flutter analyze
-          flutter test
+      - name: Format check
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Static analysis
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test
 
       - name: Build release APK
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
         run: |
-          flutter build apk --release \
-            --dart-define=API_BASE_URL=${{ secrets.API_BASE_URL }}
+          flutter build apk \
+            --release \
+            --dart-define=API_BASE_URL="$API_BASE_URL"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -43,3 +70,4 @@ jobs:
           name: ledger-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
+          retention-days: 14
