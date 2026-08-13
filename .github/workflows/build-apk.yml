@@ -40,7 +40,12 @@ jobs:
             --no-pub \
             .
 
-          sed -i 's/version "8.7.3"/version "8.11.1"/g' android/settings.gradle.kts
+          sed -i 's/id("com.android.application") version "[^"]*"/id("com.android.application") version "8.11.1"/' \
+            android/settings.gradle.kts
+
+          echo "AGP version used by CI:"
+          grep -n "com.android.application" android/settings.gradle.kts
+
           rm -f test/widget_test.dart
 
       - name: Install dependencies
