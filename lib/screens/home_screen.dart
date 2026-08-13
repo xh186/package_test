@@ -321,6 +321,41 @@ class _Settings extends StatelessWidget {
           const SizedBox(height: 10),
           Text(controller.syncMessage!, style: const TextStyle(color: LedgerTheme.muted)),
         ],
+        if (controller.hasSyncConflict) ...[
+          const SizedBox(height: 18),
+          Card(
+            color: LedgerTheme.yellow,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('检测到同步冲突', style: TextStyle(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 6),
+                  const Text('本地和云端都发生了变化，请选择保留哪一方的数据。', style: TextStyle(fontSize: 12)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: controller.isSyncing ? null : () => controller.sync(preferLocal: true),
+                          child: const Text('客户端覆盖云端'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: controller.isSyncing ? null : () => controller.sync(preferLocal: false),
+                          child: const Text('云端覆盖客户端'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: () => _export(context),
@@ -622,8 +657,12 @@ class _SubBookDetailState extends State<_SubBookDetail> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          _SummaryCards(income: book.income, expense: book.expense, balance: book.balance),
-          if (book.id <= 0) const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('子账本正在等待同步，完成后即可新增账目。', style: TextStyle(color: LedgerTheme.muted))),
+          _SummaryCards(
+            income: _incomeOf(filtered),
+            expense: _expenseOf(filtered),
+            balance: _incomeOf(filtered) - _expenseOf(filtered),
+          ),
+          if (book.id <= 0) const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('账目会先保存在本地，点击“同步云端”后一起上传。', style: TextStyle(color: LedgerTheme.muted))),
           const SizedBox(height: 22),
           const _PanelKicker(text: 'FILTER ACTIVITY'),
           const SizedBox(height: 10),
@@ -633,12 +672,6 @@ class _SubBookDetailState extends State<_SubBookDetail> {
           const SizedBox(height: 10),
           _FilterSection(title: '标签（可多选）', options: categories, selected: _categories, onChanged: (value) => setState(() => _categories = {...value})),
           const SizedBox(height: 16),
-          _SummaryCards(
-            income: _incomeOf(filtered),
-            expense: _expenseOf(filtered),
-            balance: _incomeOf(filtered) - _expenseOf(filtered),
-          ),
-          const SizedBox(height: 16),
           Text('筛选到 ${filtered.length} 条账目', style: const TextStyle(color: LedgerTheme.muted, fontSize: 12, letterSpacing: 1)),
           const SizedBox(height: 8),
           if (filtered.isEmpty)
@@ -647,7 +680,7 @@ class _SubBookDetailState extends State<_SubBookDetail> {
             ...filtered.map((item) => _TransactionTile(item: item, onTap: () => widget.edit(item), onDelete: () => widget.remove(item))),
         ],
       ),
-      floatingActionButton: FloatingActionButton(onPressed: book.id > 0 ? () => widget.edit(null, book.id) : null, tooltip: '新增账目', child: const Icon(Icons.add)),
+      floatingActionButton: FloatingActionButton(onPressed: () => widget.edit(null, book.id), tooltip: '新增账目', child: const Icon(Icons.add)),
     );
   }
 }

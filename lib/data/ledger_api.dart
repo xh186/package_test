@@ -78,12 +78,15 @@ class LedgerApi {
     );
   }
 
-  Future<void> send(SyncOperation operation) async {
+  Future<http.Response> send(SyncOperation operation) async {
     final request = http.Request(operation.method, _uri(operation.path));
     request.headers.addAll({..._sessionHeaders(), 'Content-Type': 'application/json'});
     if (operation.body != null) request.body = jsonEncode(operation.body);
     final response = await http.Response.fromStream(await _client.send(request));
+    // A DELETE of an already-removed resource is idempotent for sync purposes.
+    if (response.statusCode == 404 && operation.method == 'DELETE') return response;
     _requireSuccess(response);
+    return response;
   }
 
   String _version(http.Response response) {

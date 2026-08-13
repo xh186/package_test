@@ -113,6 +113,48 @@ class LedgerStore {
     await _savePending(pending);
   }
 
+  Future<void> removePendingForSubBookId(int subBookId) async {
+    final pending = await pendingOperations();
+    pending.removeWhere((item) => item.body?['subBookId'] == subBookId);
+    await _savePending(pending);
+  }
+
+  Future<void> replaceSubBookId(int oldId, int newId) async {
+    final pending = await pendingOperations();
+    for (var index = 0; index < pending.length; index++) {
+      final operation = pending[index];
+      final body = operation.body == null ? null : <String, dynamic>{...operation.body!};
+      if (body != null && body['subBookId'] == oldId) body['subBookId'] = newId;
+      pending[index] = SyncOperation(
+        method: operation.method,
+        path: operation.path,
+        body: body,
+        localId: operation.localId,
+      );
+    }
+    await _savePending(pending);
+  }
+
+  Future<void> replaceTransactionId(int oldId, int newId) async {
+    final pending = await pendingOperations();
+    for (var index = 0; index < pending.length; index++) {
+      final operation = pending[index];
+      final body = operation.body == null ? null : <String, dynamic>{...operation.body!};
+      if (body != null && body['id'] == oldId) body['id'] = newId;
+      pending[index] = SyncOperation(
+        method: operation.method,
+        path: operation.path,
+        body: body,
+        localId: operation.localId == oldId ? newId : operation.localId,
+      );
+    }
+    await _savePending(pending);
+  }
+
+  Future<void> clearPending() async {
+    await _savePending([]);
+  }
+
   Future<void> _savePending(List<SyncOperation> pending) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_pendingKey, jsonEncode(pending.map((item) => item.toJson()).toList()));

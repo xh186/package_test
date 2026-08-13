@@ -8,6 +8,7 @@ class LedgerTransaction {
     required this.transactionDate,
     this.createdAt,
     this.subBookId,
+    this.status = 'active',
   });
 
   final int id;
@@ -18,6 +19,9 @@ class LedgerTransaction {
   final DateTime transactionDate;
   final DateTime? createdAt;
   final int? subBookId;
+  final String status;
+
+  bool get isDeleted => status == 'deleted';
 
   bool get isIncome => type == 'income';
 
@@ -31,6 +35,7 @@ class LedgerTransaction {
       transactionDate: DateTime.tryParse(json['transactionDate'] as String? ?? '') ?? DateTime.now(),
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
       subBookId: (json['subBookId'] as num?)?.toInt(),
+      status: json['status'] as String? ?? 'active',
     );
   }
 
@@ -43,6 +48,7 @@ class LedgerTransaction {
         'transactionDate': _date(transactionDate),
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
         if (subBookId != null) 'subBookId': subBookId,
+        'status': status,
       };
 
   static String _date(DateTime value) =>
