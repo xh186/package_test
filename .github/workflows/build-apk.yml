@@ -33,15 +33,14 @@ jobs:
 
       - name: Prepare Android project
         run: |
-          if [ ! -x android/gradlew ]; then
-            flutter create \
-              --platforms=android \
-              --project-name=ledger_mobile \
-              --org=com.example \
-              --no-pub \
-              .
-          fi
+          flutter create \
+            --platforms=android \
+            --project-name=ledger_mobile \
+            --org=com.example \
+            --no-pub \
+            .
 
+          sed -i 's/version "8.7.3"/version "8.11.1"/g' android/settings.gradle.kts
           rm -f test/widget_test.dart
 
       - name: Install dependencies
