@@ -84,14 +84,90 @@ jobs:
           }
           EOF
 
+          cat > android/app/build.gradle.kts <<'EOF'
+          import java.util.Properties
+
+          plugins {
+              id("com.android.application")
+              id("org.jetbrains.kotlin.android")
+              id("dev.flutter.flutter-gradle-plugin")
+          }
+
+          val keystoreProperties = Properties()
+          val keystorePropertiesFile = rootProject.file("key.properties")
+          if (keystorePropertiesFile.exists()) {
+              keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
+          }
+
+          android {
+              namespace = "com.example.ledger_mobile"
+              compileSdk = flutter.compileSdkVersion
+
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+
+              defaultConfig {
+                  applicationId = "com.example.ledger_mobile"
+                  minSdk = flutter.minSdkVersion
+                  targetSdk = flutter.targetSdkVersion
+                  versionCode = flutter.versionCode
+                  versionName = flutter.versionName
+              }
+
+              signingConfigs {
+                  create("release") {
+                      val storeFilePath = keystoreProperties.getProperty("storeFile")
+                      if (storeFilePath != null) {
+                          storeFile = rootProject.file(storeFilePath)
+                          storePassword = keystoreProperties.getProperty("storePassword")
+                          keyAlias = keystoreProperties.getProperty("keyAlias")
+                          keyPassword = keystoreProperties.getProperty("keyPassword")
+                      }
+                  }
+              }
+
+              buildTypes {
+                  getByName("release") {
+                      signingConfig = signingConfigs.getByName("release")
+                  }
+              }
+          }
+
+          kotlin {
+              jvmToolchain(17)
+          }
+
+          flutter { source = "../.." }
+          EOF
+
           echo "Android build plugin versions used by CI:"
           grep -n -E "com.android.application|org.jetbrains.kotlin.android" android/settings.gradle.kts
           echo "JVM targets used by CI:"
           grep -n -E "sourceCompatibility|targetCompatibility|jvmToolchain" android/app/build.gradle.kts
+          echo "Release signing configuration used by CI:"
+          grep -n -E "key.properties|signingConfigs|signingConfig" android/app/build.gradle.kts
           echo "Flutter build directory redirection used by CI:"
           grep -n "newBuildDir" android/build.gradle.kts
 
           rm -f test/widget_test.dart
+
+      - name: Configure release signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=app/upload-keystore.jks
+          EOF
+          keytool -list -keystore android/app/upload-keystore.jks -storepass "$ANDROID_KEYSTORE_PASSWORD" -alias "$ANDROID_KEY_ALIAS" >/dev/null
 
       - name: Install dependencies
         run: flutter pub get

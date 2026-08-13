@@ -1,0 +1,7 @@
+.DS_Store
+*.jks
+android/key.properties
+android/app/upload-keystore.jks
+build/
+.dart_tool/
+.idea/
