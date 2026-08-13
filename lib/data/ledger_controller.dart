@@ -126,6 +126,7 @@ class LedgerController extends ChangeNotifier {
     required String type,
     required double amount,
     required String category,
+    String categorySource = 'system',
     required String note,
     required DateTime date,
     int? subBookId,
@@ -136,6 +137,7 @@ class LedgerController extends ChangeNotifier {
       type: type,
       amount: amount,
       category: category,
+      categorySource: categorySource,
       note: note,
       transactionDate: date,
       subBookId: subBookId,
@@ -166,6 +168,7 @@ class LedgerController extends ChangeNotifier {
       type: transaction.type,
       amount: transaction.amount,
       category: transaction.category,
+      categorySource: transaction.categorySource,
       note: transaction.note,
       transactionDate: transaction.transactionDate,
       createdAt: transaction.createdAt,
@@ -194,7 +197,8 @@ class LedgerController extends ChangeNotifier {
         id: transaction.id,
         type: transaction.type,
         amount: transaction.amount,
-        category: transaction.category,
+      category: transaction.category,
+      categorySource: transaction.categorySource,
         note: transaction.note,
         transactionDate: transaction.transactionDate,
         createdAt: transaction.createdAt,
@@ -277,7 +281,7 @@ class LedgerController extends ChangeNotifier {
         if (remoteId != null && operation.localId! < 0) {
           final oldId = operation.localId!;
           _allTransactions = _allTransactions
-              .map((item) => item.id == oldId ? LedgerTransaction(id: remoteId, type: item.type, amount: item.amount, category: item.category, note: item.note, transactionDate: item.transactionDate, createdAt: item.createdAt, subBookId: item.subBookId, status: item.status) : item)
+              .map((item) => item.id == oldId ? LedgerTransaction(id: remoteId, type: item.type, amount: item.amount, category: item.category, categorySource: item.categorySource, note: item.note, transactionDate: item.transactionDate, createdAt: item.createdAt, subBookId: item.subBookId, status: item.status) : item)
               .toList();
           await _store.replaceTransactionId(oldId, remoteId);
           await _store.saveTransactions(_allTransactions);
@@ -293,7 +297,7 @@ class LedgerController extends ChangeNotifier {
               .map((book) => book.id == oldId ? LedgerSubBook(id: remoteId, name: book.name, eventDate: book.eventDate, transactions: book.transactions, remoteIncome: book.remoteIncome, remoteExpense: book.remoteExpense, remoteTransactionCount: book.remoteTransactionCount) : book)
               .toList();
           _allTransactions = _allTransactions
-              .map((item) => item.subBookId == oldId ? LedgerTransaction(id: item.id, type: item.type, amount: item.amount, category: item.category, note: item.note, transactionDate: item.transactionDate, createdAt: item.createdAt, subBookId: remoteId, status: item.status) : item)
+              .map((item) => item.subBookId == oldId ? LedgerTransaction(id: item.id, type: item.type, amount: item.amount, category: item.category, categorySource: item.categorySource, note: item.note, transactionDate: item.transactionDate, createdAt: item.createdAt, subBookId: remoteId, status: item.status) : item)
               .toList();
           await _store.replaceSubBookId(oldId, remoteId);
           _refreshSubBookSummaries();
@@ -334,7 +338,7 @@ class LedgerController extends ChangeNotifier {
         'type': item.type,
         'amount': item.amount,
         'category': item.category,
-        'categorySource': 'system',
+        'categorySource': item.categorySource,
         'note': item.note,
         'transactionDate': _date(item.transactionDate),
         if (item.subBookId != null) 'subBookId': item.subBookId,

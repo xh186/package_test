@@ -5,6 +5,7 @@ class LedgerTransaction {
     required this.amount,
     required this.note,
     required this.category,
+    this.categorySource = 'system',
     required this.transactionDate,
     this.createdAt,
     this.subBookId,
@@ -16,6 +17,7 @@ class LedgerTransaction {
   final double amount;
   final String note;
   final String category;
+  final String categorySource;
   final DateTime transactionDate;
   final DateTime? createdAt;
   final int? subBookId;
@@ -32,6 +34,7 @@ class LedgerTransaction {
       amount: (json['amount'] as num).toDouble(),
       note: json['note'] as String? ?? '',
       category: json['category'] as String? ?? '其他',
+      categorySource: json['categorySource'] as String? ?? 'system',
       transactionDate: DateTime.tryParse(json['transactionDate'] as String? ?? '') ?? DateTime.now(),
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
       subBookId: (json['subBookId'] as num?)?.toInt(),
@@ -45,6 +48,7 @@ class LedgerTransaction {
         'amount': amount,
         'note': note,
         'category': category,
+        'categorySource': categorySource,
         'transactionDate': _date(transactionDate),
         if (createdAt != null) 'createdAt': createdAt!.toIso8601String(),
         if (subBookId != null) 'subBookId': subBookId,
