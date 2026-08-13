@@ -29,12 +29,14 @@ class CachedLedger {
     required this.subBooks,
     this.transactionsEtag,
     this.subBooksEtag,
+    this.lastSyncAt,
   });
 
   final List<LedgerTransaction> transactions;
   final List<LedgerSubBook> subBooks;
   final String? transactionsEtag;
   final String? subBooksEtag;
+  final DateTime? lastSyncAt;
 }
 
 class LedgerStore {
@@ -43,6 +45,7 @@ class LedgerStore {
   static const _transactionsEtagKey = 'ledger.transactions.etag.v1';
   static const _subBooksEtagKey = 'ledger.sub_books.etag.v1';
   static const _pendingKey = 'ledger.pending_sync.v1';
+  static const _lastSyncAtKey = 'ledger.last_sync_at.v1';
 
   Future<CachedLedger> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -55,6 +58,7 @@ class LedgerStore {
       subBooks: subBooks,
       transactionsEtag: prefs.getString(_transactionsEtagKey),
       subBooksEtag: prefs.getString(_subBooksEtagKey),
+      lastSyncAt: DateTime.tryParse(prefs.getString(_lastSyncAtKey) ?? ''),
     );
   }
 
@@ -68,6 +72,11 @@ class LedgerStore {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_subBooksKey, jsonEncode(values.map((item) => item.toJson()).toList()));
     if (etag != null) await prefs.setString(_subBooksEtagKey, etag);
+  }
+
+  Future<void> saveLastSyncAt(DateTime value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_lastSyncAtKey, value.toIso8601String());
   }
 
   Future<List<SyncOperation>> pendingOperations() async {

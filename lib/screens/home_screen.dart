@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../data/ledger_controller.dart';
+import '../data/ledger_exporter.dart';
 import '../models/sub_book.dart';
 import '../models/transaction.dart';
 import '../theme/ledger_theme.dart';
@@ -19,9 +20,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _tab = 0;
   String _query = '';
-  String? _type;
-  String? _category;
-  String? _transactionMonth;
+  Set<String> _types = {};
+  Set<String> _categories = {};
+  Set<String> _transactionMonths = {};
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
@@ -48,30 +49,10 @@ class _HomeScreenState extends State<HomeScreen> {
         surfaceTintColor: Colors.transparent,
         titleSpacing: 20,
         title: const _Brand(),
-        actions: [
-          IconButton(
-            tooltip: '同步云端',
-            onPressed: controller.isSyncing ? null : controller.sync,
-            icon: controller.isSyncing
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.sync_rounded),
-          ),
-          IconButton(
-            tooltip: '退出登录',
-            onPressed: _logout,
-            icon: const Icon(Icons.logout_rounded),
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: controller.isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                if (controller.syncMessage != null) _SyncBanner(message: controller.syncMessage!),
-                Expanded(child: _buildView(controller)),
-              ],
-            ),
+          : _buildView(controller),
       floatingActionButton: _tab == 2
           ? FloatingActionButton.extended(
               onPressed: _createSubBook,
@@ -92,6 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(icon: Icon(Icons.folder_copy_outlined), selectedIcon: Icon(Icons.folder_copy), label: '子账本'),
           NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: '统计'),
           NavigationDestination(icon: Icon(Icons.calendar_month_outlined), selectedIcon: Icon(Icons.calendar_month), label: '日历'),
+          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: '设置'),
         ],
       ),
     );
@@ -107,13 +89,13 @@ class _HomeScreenState extends State<HomeScreen> {
       1 => _Records(
           transactions: controller.transactions,
           query: _query,
-          type: _type,
-          category: _category,
-          month: _transactionMonth,
+          types: _types,
+          categories: _categories,
+          months: _transactionMonths,
           onQuery: (value) => setState(() => _query = value),
-          onType: (value) => setState(() => _type = value),
-          onCategory: (value) => setState(() => _category = value),
-          onMonth: (value) => setState(() => _transactionMonth = value),
+          onTypes: (value) => setState(() => _types = {...value}),
+          onCategories: (value) => setState(() => _categories = {...value}),
+          onMonths: (value) => setState(() => _transactionMonths = {...value}),
           onEdit: (item) => _editTransaction(item),
           onDelete: _deleteTransaction,
         ),
@@ -123,7 +105,8 @@ class _HomeScreenState extends State<HomeScreen> {
           onDelete: _deleteSubBook,
         ),
       3 => _Statistics(transactions: controller.transactions),
-      _ => _Calendar(transactions: controller.transactions, month: _month, onMonth: (value) => setState(() => _month = value), onOpen: _openDay),
+      4 => _Calendar(transactions: controller.transactions, month: _month, onMonth: (value) => setState(() => _month = value), onOpen: _openDay),
+      _ => _Settings(controller: controller, onLogout: _logout),
     };
   }
 
@@ -265,13 +248,6 @@ class _LedgerMark extends StatelessWidget {
   Widget build(BuildContext context) => Transform.rotate(angle: -.07, child: Container(width: 34, height: 34, decoration: BoxDecoration(border: Border.all(color: LedgerTheme.ink), borderRadius: const BorderRadius.only(topLeft: Radius.circular(9), topRight: Radius.circular(4), bottomLeft: Radius.circular(4), bottomRight: Radius.circular(9))), child: const Icon(Icons.subject_outlined, size: 21)));
 }
 
-class _SyncBanner extends StatelessWidget {
-  const _SyncBanner({required this.message});
-  final String message;
-  @override
-  Widget build(BuildContext context) => Container(width: double.infinity, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8), color: LedgerTheme.paperDeep, child: Text(message, style: const TextStyle(fontSize: 12, color: LedgerTheme.muted)));
-}
-
 class _Overview extends StatelessWidget {
   const _Overview({required this.controller, required this.onEdit, required this.onDelete});
   final LedgerController controller;
@@ -300,45 +276,143 @@ class _Overview extends StatelessWidget {
       ]);
 }
 
+class _Settings extends StatelessWidget {
+  const _Settings({required this.controller, required this.onLogout});
+
+  final LedgerController controller;
+  final Future<void> Function() onLogout;
+
+  @override
+  Widget build(BuildContext context) {
+    final lastSync = controller.lastSyncAt;
+    final syncLabel = lastSync == null ? '尚未同步' : _dateTime(lastSync);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 110),
+      children: [
+        const _Heading(kicker: 'LOCAL FIRST / SETTINGS', title: '设置'),
+        const SizedBox(height: 20),
+        Card(
+          child: Column(
+            children: [
+              const ListTile(
+                leading: Icon(Icons.info_outline),
+                title: Text('应用版本'),
+                trailing: Text('1.0.0', style: TextStyle(color: LedgerTheme.muted)),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: const Icon(Icons.history_rounded),
+                title: const Text('最近同步'),
+                subtitle: const Text('仅在点击“同步云端”时访问服务器'),
+                trailing: Text(syncLabel, style: const TextStyle(color: LedgerTheme.muted)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        FilledButton.icon(
+          onPressed: controller.isSyncing ? null : controller.sync,
+          icon: controller.isSyncing
+              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.sync_rounded),
+          label: Text(controller.isSyncing ? '正在同步…' : '同步云端'),
+        ),
+        if (controller.syncMessage != null) ...[
+          const SizedBox(height: 10),
+          Text(controller.syncMessage!, style: const TextStyle(color: LedgerTheme.muted)),
+        ],
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: () => _export(context),
+          icon: const Icon(Icons.ios_share_outlined),
+          label: const Text('导出全部账目 JSON'),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: onLogout,
+          icon: const Icon(Icons.logout_rounded),
+          label: const Text('退出登录'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _export(BuildContext context) async {
+    try {
+      await LedgerExporter.exportJson(
+        transactions: controller.transactions,
+        subBooks: controller.subBooks,
+      );
+    } catch (_) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('导出失败，请稍后重试。')),
+      );
+    }
+  }
+}
+
 class _Records extends StatelessWidget {
-  const _Records({required this.transactions, required this.query, required this.type, required this.category, required this.month, required this.onQuery, required this.onType, required this.onCategory, required this.onMonth, required this.onEdit, required this.onDelete});
+  const _Records({required this.transactions, required this.query, required this.types, required this.categories, required this.months, required this.onQuery, required this.onTypes, required this.onCategories, required this.onMonths, required this.onEdit, required this.onDelete});
   final List<LedgerTransaction> transactions;
   final String query;
-  final String? type;
-  final String? category;
-  final String? month;
+  final Set<String> types;
+  final Set<String> categories;
+  final Set<String> months;
   final ValueChanged<String> onQuery;
-  final ValueChanged<String?> onType;
-  final ValueChanged<String?> onCategory;
-  final ValueChanged<String?> onMonth;
+  final ValueChanged<Set<String>> onTypes;
+  final ValueChanged<Set<String>> onCategories;
+  final ValueChanged<Set<String>> onMonths;
   final Future<void> Function(LedgerTransaction) onEdit;
   final void Function(LedgerTransaction) onDelete;
   @override
   Widget build(BuildContext context) {
-    final categories = transactions.map((item) => item.category).toSet().toList()..sort();
-    final months = transactions.map((item) => _monthKey(item.transactionDate)).toSet().toList()..sort((a, b) => b.compareTo(a));
+    final categoryOptions = transactions.map((item) => item.category).toSet().toList()..sort();
+    final monthOptions = transactions.map((item) => _monthKey(item.transactionDate)).toSet().toList()..sort((a, b) => b.compareTo(a));
     final normalizedQuery = query.trim().toLowerCase();
     final filteredTransactions = transactions.where((item) {
       final matchesQuery = normalizedQuery.isEmpty ||
           '${item.note} ${item.category} ${item.type}'.toLowerCase().contains(normalizedQuery);
       return matchesQuery &&
-          (type == null || item.type == type) &&
-          (category == null || item.category == category) &&
-          (month == null || _monthKey(item.transactionDate) == month);
+          (types.isEmpty || types.contains(item.type)) &&
+          (categories.isEmpty || categories.contains(item.category)) &&
+          (months.isEmpty || months.contains(_monthKey(item.transactionDate)));
     }).toList();
     return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
       const _Heading(kicker: 'LEDGER / ALL RECORDS', title: '全部账目'),
       const SizedBox(height: 18),
       TextField(onChanged: onQuery, decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: '搜索备注或标签')),
       const SizedBox(height: 12),
-      _MonthPicker(months: months, value: month, onChanged: onMonth),
+      _FilterSection(
+        title: '账目月份（可多选）',
+        options: monthOptions,
+        selected: this.months,
+        labelBuilder: _monthLabel,
+        onChanged: onMonths,
+      ),
       const SizedBox(height: 10),
-      SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
-        _FilterChip(label: '全部', selected: type == null, onTap: () => onType(null)),
-        _FilterChip(label: '收入', selected: type == 'income', onTap: () => onType('income')),
-        _FilterChip(label: '支出', selected: type == 'expense', onTap: () => onType('expense')),
-        ...categories.map((item) => _FilterChip(label: item, selected: category == item, onTap: () => onCategory(category == item ? null : item))),
-      ])),
+      _FilterSection(
+        title: '收支类型（可多选）',
+        options: const ['income', 'expense'],
+        selected: types,
+        labelBuilder: (value) => value == 'income' ? '收入' : '支出',
+        onChanged: onTypes,
+      ),
+      const SizedBox(height: 10),
+      _FilterSection(
+        title: '标签（可多选）',
+        options: categoryOptions,
+        selected: this.categories,
+        onChanged: onCategories,
+      ),
+      const SizedBox(height: 18),
+      _SummaryCards(
+        income: _incomeOf(filteredTransactions),
+        expense: _expenseOf(filteredTransactions),
+        balance: _incomeOf(filteredTransactions) - _expenseOf(filteredTransactions),
+      ),
       const SizedBox(height: 18),
       Text('共 ${filteredTransactions.length} 条记录', style: const TextStyle(color: LedgerTheme.muted, fontSize: 12, letterSpacing: 1)),
       const SizedBox(height: 8),
@@ -374,7 +448,7 @@ class _SubBooks extends StatelessWidget {
   const _SubBooks({required this.books, required this.onOpen, required this.onDelete});
   final List<LedgerSubBook> books;
   final ValueChanged<LedgerSubBook> onOpen;
-  final Future<void> Function(LedgerSubBook) onDelete;
+  final Future<bool> Function(LedgerSubBook) onDelete;
   @override
   Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
         const _Heading(kicker: 'ACTIVITY / COLLECTIONS', title: '子账本'),
@@ -485,14 +559,50 @@ class _SubBookDetail extends StatefulWidget {
 }
 
 class _SubBookDetailState extends State<_SubBookDetail> {
-  String? _type;
-  String? _month;
+  Set<String> _types = {};
+  Set<String> _months = {};
+  Set<String> _categories = {};
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_refresh);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_refresh);
+    super.dispose();
+  }
+
+  void _refresh() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final book = widget.book;
-    final months = book.transactions.map((item) => _monthKey(item.transactionDate)).toSet().toList()..sort((a, b) => b.compareTo(a));
-    final filtered = book.transactions.where((item) => (_type == null || item.type == _type) && (_month == null || _monthKey(item.transactionDate) == _month)).toList();
+    final sourceBook = widget.controller.subBooks.firstWhere(
+      (item) => item.id == widget.book.id,
+      orElse: () => widget.book,
+    );
+    final transactions = widget.controller.transactions.where((item) => item.subBookId == widget.book.id).toList();
+    final book = LedgerSubBook(
+      id: sourceBook.id,
+      name: sourceBook.name,
+      eventDate: sourceBook.eventDate,
+      transactions: transactions,
+      remoteIncome: transactions.where((item) => item.isIncome).fold<double>(0, (sum, item) => sum + item.amount),
+      remoteExpense: transactions.where((item) => !item.isIncome).fold<double>(0, (sum, item) => sum + item.amount),
+      remoteTransactionCount: transactions.length,
+    );
+    final months = transactions.map((item) => _monthKey(item.transactionDate)).toSet().toList()..sort((a, b) => b.compareTo(a));
+    final categories = transactions.map((item) => item.category).toSet().toList()..sort();
+    final filtered = transactions.where((item) =>
+        (_types.isEmpty || _types.contains(item.type)) &&
+        (_months.isEmpty || _months.contains(_monthKey(item.transactionDate))) &&
+        (_categories.isEmpty || _categories.contains(item.category))).toList();
     return Scaffold(
       appBar: AppBar(
         title: Text(book.name),
@@ -517,13 +627,17 @@ class _SubBookDetailState extends State<_SubBookDetail> {
           const SizedBox(height: 22),
           const _PanelKicker(text: 'FILTER ACTIVITY'),
           const SizedBox(height: 10),
-          _MonthPicker(months: months, value: _month, onChanged: (value) => setState(() => _month = value)),
+          _FilterSection(title: '账目月份（可多选）', options: months, selected: _months, labelBuilder: _monthLabel, onChanged: (value) => setState(() => _months = {...value})),
           const SizedBox(height: 10),
-          Row(children: [
-            _FilterChip(label: '全部', selected: _type == null, onTap: () => setState(() => _type = null)),
-            _FilterChip(label: '收入', selected: _type == 'income', onTap: () => setState(() => _type = 'income')),
-            _FilterChip(label: '支出', selected: _type == 'expense', onTap: () => setState(() => _type = 'expense')),
-          ]),
+          _FilterSection(title: '收支类型（可多选）', options: const ['income', 'expense'], selected: _types, labelBuilder: (value) => value == 'income' ? '收入' : '支出', onChanged: (value) => setState(() => _types = {...value})),
+          const SizedBox(height: 10),
+          _FilterSection(title: '标签（可多选）', options: categories, selected: _categories, onChanged: (value) => setState(() => _categories = {...value})),
+          const SizedBox(height: 16),
+          _SummaryCards(
+            income: _incomeOf(filtered),
+            expense: _expenseOf(filtered),
+            balance: _incomeOf(filtered) - _expenseOf(filtered),
+          ),
           const SizedBox(height: 16),
           Text('筛选到 ${filtered.length} 条账目', style: const TextStyle(color: LedgerTheme.muted, fontSize: 12, letterSpacing: 1)),
           const SizedBox(height: 8),
@@ -538,23 +652,56 @@ class _SubBookDetailState extends State<_SubBookDetail> {
   }
 }
 
-class _MonthPicker extends StatelessWidget {
-  const _MonthPicker({required this.months, required this.value, required this.onChanged});
+class _FilterSection extends StatelessWidget {
+  const _FilterSection({required this.title, required this.options, required this.selected, required this.onChanged, this.labelBuilder});
 
-  final List<String> months;
-  final String? value;
-  final ValueChanged<String?> onChanged;
+  final String title;
+  final List<String> options;
+  final Set<String> selected;
+  final ValueChanged<Set<String>> onChanged;
+  final String Function(String value)? labelBuilder;
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<String?>(
-      initialValue: value,
-      decoration: const InputDecoration(labelText: '账目月份', prefixIcon: Icon(Icons.calendar_month_outlined)),
-      items: [
-        const DropdownMenuItem<String?>(value: null, child: Text('全部月份')),
-        ...months.map((month) => DropdownMenuItem<String?>(value: month, child: Text(_monthLabel(month)))),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(color: LedgerTheme.muted, fontSize: 12, letterSpacing: .5)),
+        const SizedBox(height: 6),
+        if (options.isEmpty)
+          const Text('暂无选项', style: TextStyle(color: LedgerTheme.muted, fontSize: 12))
+        else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: options
+                  .map(
+                    (option) => _FilterChip(
+                      label: labelBuilder?.call(option) ?? option,
+                      selected: selected.contains(option),
+                      onTap: () {
+                        final next = {...selected};
+                        if (next.contains(option)) {
+                          next.remove(option);
+                        } else {
+                          next.add(option);
+                        }
+                        onChanged(next);
+                      },
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        if (selected.isNotEmpty)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => onChanged({}),
+              child: const Text('清除本组'),
+            ),
+          ),
       ],
-      onChanged: onChanged,
     );
   }
 }
@@ -610,7 +757,10 @@ class _FilterChip extends StatelessWidget { const _FilterChip({required this.lab
 class _EmptyState extends StatelessWidget { const _EmptyState({required this.text}); final String text; @override Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 48), child: Center(child: Text(text, textAlign: TextAlign.center, style: const TextStyle(color: LedgerTheme.muted, height: 1.6)))); }
 class _TransactionTile extends StatelessWidget { const _TransactionTile({required this.item, required this.onTap, this.onDelete}); final LedgerTransaction item; final VoidCallback onTap; final VoidCallback? onDelete; @override Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(onTap: onTap, leading: CircleAvatar(backgroundColor: item.isIncome ? LedgerTheme.mint : LedgerTheme.coral, child: Icon(item.isIncome ? Icons.south_west : Icons.north_east, color: LedgerTheme.ink, size: 17)), title: Text(item.category), subtitle: Text('${_date(item.transactionDate)}${item.note.isEmpty ? '' : ' · ${item.note}'}', maxLines: 1, overflow: TextOverflow.ellipsis), trailing: Row(mainAxisSize: MainAxisSize.min, children: [Text('${item.isIncome ? '+' : '-'}¥${item.amount.toStringAsFixed(2)}', style: TextStyle(color: item.isIncome ? const Color(0xFF277849) : const Color(0xFFBD543F), fontFamily: 'monospace', fontWeight: FontWeight.w700)), if (onDelete != null) IconButton(tooltip: '删除', onPressed: onDelete, icon: const Icon(Icons.delete_outline, size: 19))]))); }
 bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+double _incomeOf(Iterable<LedgerTransaction> items) => items.where((item) => item.isIncome).fold<double>(0, (sum, item) => sum + item.amount);
+double _expenseOf(Iterable<LedgerTransaction> items) => items.where((item) => !item.isIncome).fold<double>(0, (sum, item) => sum + item.amount);
 String _date(DateTime value) => '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+String _dateTime(DateTime value) => '${_date(value)} ${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
 String _monthKey(DateTime value) => '${value.year}-${value.month.toString().padLeft(2, '0')}';
 String _monthLabel(String value) {
   final parts = value.split('-');

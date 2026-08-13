@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart';
 
 import '../models/sub_book.dart';
@@ -19,6 +17,7 @@ class LedgerController extends ChangeNotifier {
   bool isLoading = true;
   bool isSyncing = false;
   String? syncMessage;
+  DateTime? lastSyncAt;
 
   double get income => transactions.where((item) => item.isIncome).fold(0, (sum, item) => sum + item.amount);
   double get expense => transactions.where((item) => !item.isIncome).fold(0, (sum, item) => sum + item.amount);
@@ -34,9 +33,9 @@ class LedgerController extends ChangeNotifier {
     subBooks = cached.subBooks;
     _transactionsEtag = cached.transactionsEtag;
     _subBooksEtag = cached.subBooksEtag;
+    lastSyncAt = cached.lastSyncAt;
     isLoading = false;
     notifyListeners();
-    unawaited(sync());
   }
 
   Future<void> sync() async {
@@ -65,6 +64,8 @@ class LedgerController extends ChangeNotifier {
         await _store.saveSubBooks(subBooks, etag: _subBooksEtag);
       }
       syncMessage = transactionsChanged || subBooksChanged ? '已同步云端更新' : '已是最新数据';
+      lastSyncAt = DateTime.now();
+      await _store.saveLastSyncAt(lastSyncAt!);
     } catch (_) {
       syncMessage = '离线模式：正在使用本地缓存';
     } finally {
@@ -95,7 +96,6 @@ class LedgerController extends ChangeNotifier {
     await _store.saveTransactions(transactions);
     await _store.enqueue(SyncOperation(method: 'POST', path: '/api/transactions', body: _payload(transaction), localId: temporaryId));
     notifyListeners();
-    unawaited(sync());
   }
 
   Future<void> updateTransaction(LedgerTransaction updated) async {
@@ -107,7 +107,6 @@ class LedgerController extends ChangeNotifier {
       await _store.replacePendingForLocalId(updated.id, SyncOperation(method: 'POST', path: '/api/transactions', body: _payload(updated), localId: updated.id));
     }
     notifyListeners();
-    unawaited(sync());
   }
 
   Future<void> deleteTransaction(LedgerTransaction transaction) async {
@@ -119,7 +118,6 @@ class LedgerController extends ChangeNotifier {
       await _store.removePendingForLocalId(transaction.id);
     }
     notifyListeners();
-    unawaited(sync());
   }
 
   Future<void> deleteSubBook(LedgerSubBook book) async {
@@ -131,7 +129,6 @@ class LedgerController extends ChangeNotifier {
       await _store.removePendingForLocalId(book.id);
     }
     notifyListeners();
-    unawaited(sync());
   }
 
   Future<void> createSubBook(String name, DateTime eventDate) async {
@@ -143,7 +140,6 @@ class LedgerController extends ChangeNotifier {
       'eventDate': _date(eventDate),
     }, localId: book.id));
     notifyListeners();
-    unawaited(sync());
   }
 
   Future<void> _flushPending() async {
