@@ -8,6 +8,11 @@ android {
     namespace = "com.example.ledger_mobile"
     compileSdk = flutter.compileSdkVersion
 
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
     defaultConfig {
         applicationId = "com.example.ledger_mobile"
         minSdk = flutter.minSdkVersion
@@ -15,6 +20,10 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
+}
+
+kotlin {
+    jvmToolchain(17)
 }
 
 flutter { source = "../.." }

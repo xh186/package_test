@@ -46,8 +46,23 @@ jobs:
           sed -i 's/id("org.jetbrains.kotlin.android") version "[^"]*"/id("org.jetbrains.kotlin.android") version "2.2.20"/' \
             android/settings.gradle.kts
 
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("android/app/build.gradle.kts")
+          text = path.read_text()
+          compile_options = """\n    compileOptions {\n        sourceCompatibility = JavaVersion.VERSION_17\n        targetCompatibility = JavaVersion.VERSION_17\n    }\n"""
+          if "sourceCompatibility = JavaVersion.VERSION_17" not in text:
+              text = text.replace("    compileSdk = flutter.compileSdkVersion\n", "    compileSdk = flutter.compileSdkVersion\n" + compile_options)
+          if "jvmToolchain(17)" not in text:
+              text = text.replace("\nflutter { source = \"../..\" }", "\nkotlin {\n    jvmToolchain(17)\n}\n\nflutter { source = \"../..\" }")
+          path.write_text(text)
+          PY
+
           echo "Android build plugin versions used by CI:"
           grep -n -E "com.android.application|org.jetbrains.kotlin.android" android/settings.gradle.kts
+          echo "JVM targets used by CI:"
+          grep -n -E "sourceCompatibility|targetCompatibility|jvmToolchain" android/app/build.gradle.kts
 
           rm -f test/widget_test.dart
 
