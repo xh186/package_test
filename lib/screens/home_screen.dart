@@ -7,9 +7,10 @@ import '../theme/ledger_theme.dart';
 import '../widgets/transaction_editor.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key, required this.controller});
+  const HomeScreen({super.key, required this.controller, required this.onLogout});
 
   final LedgerController controller;
+  final VoidCallback onLogout;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -20,6 +21,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _query = '';
   String? _type;
   String? _category;
+  String? _transactionMonth;
   DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
 
   @override
@@ -53,6 +55,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: controller.isSyncing
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.sync_rounded),
+          ),
+          IconButton(
+            tooltip: '退出登录',
+            onPressed: _logout,
+            icon: const Icon(Icons.logout_rounded),
           ),
           const SizedBox(width: 8),
         ],
@@ -94,13 +101,15 @@ class _HomeScreenState extends State<HomeScreen> {
     return switch (_tab) {
       0 => _Overview(controller: controller, onEdit: (item) => _editTransaction(item)),
       1 => _Records(
-          transactions: _filteredTransactions(controller.transactions),
+          transactions: controller.transactions,
           query: _query,
           type: _type,
           category: _category,
+          month: _transactionMonth,
           onQuery: (value) => setState(() => _query = value),
           onType: (value) => setState(() => _type = value),
           onCategory: (value) => setState(() => _category = value),
+          onMonth: (value) => setState(() => _transactionMonth = value),
           onEdit: (item) => _editTransaction(item),
           onDelete: _deleteTransaction,
         ),
@@ -114,8 +123,32 @@ class _HomeScreenState extends State<HomeScreen> {
     return source.where((item) {
       final query = _query.toLowerCase();
       final matchesQuery = query.isEmpty || '${item.note} ${item.category} ${item.type}'.toLowerCase().contains(query);
-      return matchesQuery && (_type == null || item.type == _type) && (_category == null || item.category == _category);
+      return matchesQuery &&
+          (_type == null || item.type == _type) &&
+          (_category == null || item.category == _category) &&
+          (_transactionMonth == null || _monthKey(item.transactionDate) == _transactionMonth);
     }).toList();
+  }
+
+  Future<void> _logout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('退出登录？'),
+        content: const Text('本地账目缓存会保留，但云端同步将暂停。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('退出')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.controller.logout();
+    } catch (_) {
+      // The local session must be cleared even when the logout endpoint is offline.
+    }
+    widget.onLogout();
   }
 
   Future<void> _editTransaction([LedgerTransaction? item, int? subBookId]) async {
@@ -232,24 +265,29 @@ class _Overview extends StatelessWidget {
 }
 
 class _Records extends StatelessWidget {
-  const _Records({required this.transactions, required this.query, required this.type, required this.category, required this.onQuery, required this.onType, required this.onCategory, required this.onEdit, required this.onDelete});
+  const _Records({required this.transactions, required this.query, required this.type, required this.category, required this.month, required this.onQuery, required this.onType, required this.onCategory, required this.onMonth, required this.onEdit, required this.onDelete});
   final List<LedgerTransaction> transactions;
   final String query;
   final String? type;
   final String? category;
+  final String? month;
   final ValueChanged<String> onQuery;
   final ValueChanged<String?> onType;
   final ValueChanged<String?> onCategory;
+  final ValueChanged<String?> onMonth;
   final Future<void> Function(LedgerTransaction) onEdit;
   final void Function(LedgerTransaction) onDelete;
   @override
   Widget build(BuildContext context) {
     final categories = transactions.map((item) => item.category).toSet().toList()..sort();
+    final months = transactions.map((item) => _monthKey(item.transactionDate)).toSet().toList()..sort((a, b) => b.compareTo(a));
     return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
       const _Heading(kicker: 'LEDGER / ALL RECORDS', title: '全部账目'),
       const SizedBox(height: 18),
       TextField(onChanged: onQuery, decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: '搜索备注或标签')),
       const SizedBox(height: 12),
+      _MonthPicker(months: months, value: month, onChanged: onMonth),
+      const SizedBox(height: 10),
       SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
         _FilterChip(label: '全部', selected: type == null, onTap: () => onType(null)),
         _FilterChip(label: '收入', selected: type == 'income', onTap: () => onType('income')),
@@ -312,14 +350,76 @@ class _Calendar extends StatelessWidget {
   }
 }
 
-class _SubBookDetail extends StatelessWidget {
+class _SubBookDetail extends StatefulWidget {
   const _SubBookDetail({required this.book, required this.controller, required this.edit, required this.remove});
   final LedgerSubBook book;
   final LedgerController controller;
   final Future<void> Function([LedgerTransaction? item, int? subBookId]) edit;
   final Future<void> Function(LedgerTransaction) remove;
+
   @override
-  Widget build(BuildContext context) => Scaffold(appBar: AppBar(title: Text(book.name)), body: ListView(padding: const EdgeInsets.all(20), children: [_SummaryCards(income: book.income, expense: book.expense, balance: book.balance), if (book.id <= 0) const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('子账本正在等待同步，完成后即可新增账目。', style: TextStyle(color: LedgerTheme.muted))), const SizedBox(height: 16), ...book.transactions.map((item) => _TransactionTile(item: item, onTap: () => edit(item), onDelete: () => remove(item))) ]), floatingActionButton: FloatingActionButton(onPressed: book.id > 0 ? () => edit(null, book.id) : null, tooltip: '新增账目', child: const Icon(Icons.add)));
+  State<_SubBookDetail> createState() => _SubBookDetailState();
+}
+
+class _SubBookDetailState extends State<_SubBookDetail> {
+  String? _type;
+  String? _month;
+
+  @override
+  Widget build(BuildContext context) {
+    final book = widget.book;
+    final months = book.transactions.map((item) => _monthKey(item.transactionDate)).toSet().toList()..sort((a, b) => b.compareTo(a));
+    final filtered = book.transactions.where((item) => (_type == null || item.type == _type) && (_month == null || _monthKey(item.transactionDate) == _month)).toList();
+    return Scaffold(
+      appBar: AppBar(title: Text(book.name)),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _SummaryCards(income: book.income, expense: book.expense, balance: book.balance),
+          if (book.id <= 0) const Padding(padding: EdgeInsets.symmetric(vertical: 12), child: Text('子账本正在等待同步，完成后即可新增账目。', style: TextStyle(color: LedgerTheme.muted))),
+          const SizedBox(height: 22),
+          const _PanelKicker(text: 'FILTER ACTIVITY'),
+          const SizedBox(height: 10),
+          _MonthPicker(months: months, value: _month, onChanged: (value) => setState(() => _month = value)),
+          const SizedBox(height: 10),
+          Row(children: [
+            _FilterChip(label: '全部', selected: _type == null, onTap: () => setState(() => _type = null)),
+            _FilterChip(label: '收入', selected: _type == 'income', onTap: () => setState(() => _type = 'income')),
+            _FilterChip(label: '支出', selected: _type == 'expense', onTap: () => setState(() => _type = 'expense')),
+          ]),
+          const SizedBox(height: 16),
+          Text('筛选到 ${filtered.length} 条账目', style: const TextStyle(color: LedgerTheme.muted, fontSize: 12, letterSpacing: 1)),
+          const SizedBox(height: 8),
+          if (filtered.isEmpty)
+            const _EmptyState(text: '没有匹配的账目')
+          else
+            ...filtered.map((item) => _TransactionTile(item: item, onTap: () => widget.edit(item), onDelete: () => widget.remove(item))),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton(onPressed: book.id > 0 ? () => widget.edit(null, book.id) : null, tooltip: '新增账目', child: const Icon(Icons.add)),
+    );
+  }
+}
+
+class _MonthPicker extends StatelessWidget {
+  const _MonthPicker({required this.months, required this.value, required this.onChanged});
+
+  final List<String> months;
+  final String? value;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String?>(
+      initialValue: value,
+      decoration: const InputDecoration(labelText: '账目月份', prefixIcon: Icon(Icons.calendar_month_outlined)),
+      items: [
+        const DropdownMenuItem<String?>(value: null, child: Text('全部月份')),
+        ...months.map((month) => DropdownMenuItem<String?>(value: month, child: Text(_monthLabel(month)))),
+      ],
+      onChanged: onChanged,
+    );
+  }
 }
 
 class _DaySheet extends StatelessWidget {
@@ -374,3 +474,8 @@ class _EmptyState extends StatelessWidget { const _EmptyState({required this.tex
 class _TransactionTile extends StatelessWidget { const _TransactionTile({required this.item, required this.onTap, this.onDelete}); final LedgerTransaction item; final VoidCallback onTap; final VoidCallback? onDelete; @override Widget build(BuildContext context) => Card(margin: const EdgeInsets.only(bottom: 8), child: ListTile(onTap: onTap, leading: CircleAvatar(backgroundColor: item.isIncome ? LedgerTheme.mint : LedgerTheme.coral, child: Icon(item.isIncome ? Icons.south_west : Icons.north_east, color: LedgerTheme.ink, size: 17)), title: Text(item.category), subtitle: Text('${_date(item.transactionDate)}${item.note.isEmpty ? '' : ' · ${item.note}'}', maxLines: 1, overflow: TextOverflow.ellipsis), trailing: Row(mainAxisSize: MainAxisSize.min, children: [Text('${item.isIncome ? '+' : '-'}¥${item.amount.toStringAsFixed(2)}', style: TextStyle(color: item.isIncome ? const Color(0xFF277849) : const Color(0xFFBD543F), fontFamily: 'monospace', fontWeight: FontWeight.w700)), if (onDelete != null) IconButton(tooltip: '删除', onPressed: onDelete, icon: const Icon(Icons.delete_outline, size: 19))]))); }
 bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
 String _date(DateTime value) => '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+String _monthKey(DateTime value) => '${value.year}-${value.month.toString().padLeft(2, '0')}';
+String _monthLabel(String value) {
+  final parts = value.split('-');
+  return parts.length == 2 ? '${parts[0]}年${int.tryParse(parts[1]) ?? parts[1]}月' : value;
+}

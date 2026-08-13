@@ -44,6 +44,15 @@ class _AuthGateState extends State<_AuthGate> {
   @override
   Widget build(BuildContext context) {
     if (_hasSession == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    return _hasSession! ? HomeScreen(controller: widget.controller) : LoginScreen(controller: widget.controller, onContinueOffline: () => setState(() => _hasSession = true), onAuthenticated: () => setState(() => _hasSession = true));
+    return _hasSession!
+        ? HomeScreen(
+            controller: widget.controller,
+            onLogout: () => setState(() => _hasSession = false),
+          )
+        : LoginScreen(
+            controller: widget.controller,
+            onContinueOffline: () => setState(() => _hasSession = true),
+            onAuthenticated: () => setState(() => _hasSession = true),
+          );
   }
 }
