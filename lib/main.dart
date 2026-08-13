@@ -39,11 +39,24 @@ class _AuthGate extends StatefulWidget {
 class _AuthGateState extends State<_AuthGate> {
   bool? _hasSession;
   @override
-  void initState() { super.initState(); _check(); }
-  Future<void> _check() async { final has = await widget.controller.restoreSession(); if (mounted) setState(() => _hasSession = has); }
+  void initState() {
+    super.initState();
+    _check();
+  }
+
+  Future<void> _check() async {
+    final has = await widget.controller.restoreSession();
+    if (mounted) {
+      setState(() => _hasSession = has);
+    }
+  }
   @override
   Widget build(BuildContext context) {
-    if (_hasSession == null) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (_hasSession == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return _hasSession!
         ? HomeScreen(
             controller: widget.controller,

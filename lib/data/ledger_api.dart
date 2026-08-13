@@ -36,7 +36,9 @@ class LedgerApi {
     );
     _requireSuccess(response);
     final setCookie = response.headers['set-cookie'];
-    if (setCookie == null || !setCookie.contains('ledger_session=')) throw StateError('登录响应未包含会话');
+    if (setCookie == null || !setCookie.contains('ledger_session=')) {
+      throw StateError('登录响应未包含会话');
+    }
     _cookie = setCookie.split(';').first;
     await _secureStorage.write(key: 'ledger.session.cookie.v1', value: _cookie);
   }

@@ -119,17 +119,6 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
-  List<LedgerTransaction> _filteredTransactions(List<LedgerTransaction> source) {
-    return source.where((item) {
-      final query = _query.toLowerCase();
-      final matchesQuery = query.isEmpty || '${item.note} ${item.category} ${item.type}'.toLowerCase().contains(query);
-      return matchesQuery &&
-          (_type == null || item.type == _type) &&
-          (_category == null || item.category == _category) &&
-          (_transactionMonth == null || _monthKey(item.transactionDate) == _transactionMonth);
-    }).toList();
-  }
-
   Future<void> _logout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -142,7 +131,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true) {
+      return;
+    }
     try {
       await widget.controller.logout();
     } catch (_) {
@@ -158,7 +149,9 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (_) => TransactionEditor(transaction: item),
     );
-    if (result == null) return;
+    if (result == null) {
+      return;
+    }
     if (item == null) {
       await widget.controller.addTransaction(
         type: result.type,
@@ -191,7 +184,9 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('取消')), FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('删除'))],
       ),
     );
-    if (confirmed == true) await widget.controller.deleteTransaction(item);
+    if (confirmed == true) {
+      await widget.controller.deleteTransaction(item);
+    }
   }
 
   Future<void> _createSubBook() async {
@@ -206,13 +201,17 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 12),
               ListTile(contentPadding: EdgeInsets.zero, title: const Text('活动日期'), subtitle: Text(_date(date)), trailing: const Icon(Icons.calendar_today_outlined), onTap: () async {
                 final selected = await showDatePicker(context: context, firstDate: DateTime(2000), lastDate: DateTime(2100), initialDate: date);
-                if (selected != null) update(() => date = selected);
+                if (selected != null) {
+                  update(() => date = selected);
+                }
               }),
             ]),
             actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')), FilledButton(onPressed: () => Navigator.pop(context, (name.text.trim(), date)), child: const Text('创建'))],
           )),
     );
-    if (result != null && result.$1.isNotEmpty) await widget.controller.createSubBook(result.$1, result.$2);
+    if (result != null && result.$1.isNotEmpty) {
+      await widget.controller.createSubBook(result.$1, result.$2);
+    }
   }
 
   void _openSubBook(LedgerSubBook book) {
@@ -281,6 +280,15 @@ class _Records extends StatelessWidget {
   Widget build(BuildContext context) {
     final categories = transactions.map((item) => item.category).toSet().toList()..sort();
     final months = transactions.map((item) => _monthKey(item.transactionDate)).toSet().toList()..sort((a, b) => b.compareTo(a));
+    final normalizedQuery = query.trim().toLowerCase();
+    final filteredTransactions = transactions.where((item) {
+      final matchesQuery = normalizedQuery.isEmpty ||
+          '${item.note} ${item.category} ${item.type}'.toLowerCase().contains(normalizedQuery);
+      return matchesQuery &&
+          (type == null || item.type == type) &&
+          (category == null || item.category == category) &&
+          (month == null || _monthKey(item.transactionDate) == month);
+    }).toList();
     return ListView(padding: const EdgeInsets.fromLTRB(20, 20, 20, 110), children: [
       const _Heading(kicker: 'LEDGER / ALL RECORDS', title: '全部账目'),
       const SizedBox(height: 18),
@@ -295,9 +303,9 @@ class _Records extends StatelessWidget {
         ...categories.map((item) => _FilterChip(label: item, selected: category == item, onTap: () => onCategory(category == item ? null : item))),
       ])),
       const SizedBox(height: 18),
-      Text('共 ${transactions.length} 条记录', style: const TextStyle(color: LedgerTheme.muted, fontSize: 12, letterSpacing: 1)),
+      Text('共 ${filteredTransactions.length} 条记录', style: const TextStyle(color: LedgerTheme.muted, fontSize: 12, letterSpacing: 1)),
       const SizedBox(height: 8),
-      if (transactions.isEmpty) const _EmptyState(text: '没有匹配的账目') else ...transactions.map((item) => Dismissible(key: ValueKey(item.id), direction: DismissDirection.endToStart, confirmDismiss: (_) async { onDelete(item); return false; }, background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 24), color: LedgerTheme.coral, child: const Icon(Icons.delete_outline)), child: _TransactionTile(item: item, onTap: () => onEdit(item)))),
+      if (filteredTransactions.isEmpty) const _EmptyState(text: '没有匹配的账目') else ...filteredTransactions.map((item) => Dismissible(key: ValueKey(item.id), direction: DismissDirection.endToStart, confirmDismiss: (_) async { onDelete(item); return false; }, background: Container(alignment: Alignment.centerRight, padding: const EdgeInsets.only(right: 24), color: LedgerTheme.coral, child: const Icon(Icons.delete_outline)), child: _TransactionTile(item: item, onTap: () => onEdit(item)))),
     ]);
   }
 }
