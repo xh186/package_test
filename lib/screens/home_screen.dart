@@ -425,7 +425,7 @@ class _Records extends StatelessWidget {
       _FilterSection(
         title: '账目月份（可多选）',
         options: monthOptions,
-        selected: this.months,
+        selected: months,
         labelBuilder: _monthLabel,
         onChanged: onMonths,
       ),
@@ -441,7 +441,7 @@ class _Records extends StatelessWidget {
       _FilterSection(
         title: '标签（可多选）',
         options: categoryOptions,
-        selected: this.categories,
+        selected: categories,
         onChanged: onCategories,
       ),
       const SizedBox(height: 18),

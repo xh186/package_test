@@ -30,7 +30,6 @@ class _TransactionEditorState extends State<TransactionEditor> {
 
   late String _type;
   late String _category;
-  late String _categorySource;
   late DateTime _date;
   late final TextEditingController _amount;
   late final TextEditingController _note;
@@ -47,7 +46,6 @@ class _TransactionEditorState extends State<TransactionEditor> {
     super.initState();
     final item = widget.transaction;
     _type = item?.type ?? 'expense';
-    _categorySource = item?.categorySource ?? 'system';
     _category = item?.categorySource == 'custom' ? '其他' : (item?.category ?? _expenseCategories.first);
     _date = item?.transactionDate ?? DateTime.now();
     _amount = TextEditingController(text: item == null ? '' : item.amount.toStringAsFixed(2));
@@ -105,7 +103,6 @@ class _TransactionEditorState extends State<TransactionEditor> {
                     onSelectionChanged: (value) => setState(() {
                       _type = value.first;
                       _category = _categories.first;
-                      _categorySource = 'system';
                     }),
                   ),
                   const SizedBox(height: 16),
@@ -127,7 +124,6 @@ class _TransactionEditorState extends State<TransactionEditor> {
                     items: _categories.map((item) => DropdownMenuItem(value: item, child: Text(item))).toList(),
                     onChanged: (value) => setState(() {
                       _category = value ?? _category;
-                      _categorySource = _category == '其他' ? 'custom' : 'system';
                     }),
                   ),
                   if (_category == '其他') ...[

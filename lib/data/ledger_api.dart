@@ -95,7 +95,9 @@ class LedgerApi {
   }
 
   Map<String, String> _etagHeaders(String? version) {
-    if (version == null || !version.startsWith('etag:')) return {};
+    if (version == null || !version.startsWith('etag:')) {
+      return {};
+    }
     return {'If-None-Match': version.substring(5)};
   }
 
